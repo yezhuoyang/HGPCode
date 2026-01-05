@@ -91,12 +91,15 @@ const VizModule = (function() {
 
         // Grid dimensions for the 4 blocks
         // To form a perfect rectangle:
-        // - Left column (X-stab, Qubit2): r2 columns wide
-        // - Right column (Qubit1, Z-stab): n2 columns wide
-        // X-stab has r1*n2 checks, arranged as n2 rows × r2 cols (transposed)
-        // Z-stab has n1*r2 checks, arranged as r2 rows × n2 cols (transposed)
+        // - Left column (X-stab, Qubit2): both have r1 columns (C1 checks)
+        // - Right column (Qubit1, Z-stab): both have n1 columns (C1 bits)
+        // - Top row (X-stab, Qubit1): X-stab has n2 rows (C2 bits), Qubit1 has n1 rows
+        // - Bottom row (Qubit2, Z-stab): Qubit2 has r1 rows, Z-stab has r2 rows (C2 checks)
+        //
+        // X-stab: r1*n2 checks arranged as n2 rows × r1 cols (transposed from r1×n2)
+        // Z-stab: n1*r2 checks arranged as r2 rows × n1 cols (transposed from n1×r2)
 
-        const xStabWidth = r2 * GRID_SPACING;   // X-stab: n2 rows × r2 cols (transposed)
+        const xStabWidth = r1 * GRID_SPACING;   // X-stab: n2 rows × r1 cols (transposed)
         const xStabHeight = n2 * GRID_SPACING;
 
         const qubit1Width = n2 * GRID_SPACING;  // Qubit block 1: n1 rows × n2 cols
@@ -105,7 +108,7 @@ const VizModule = (function() {
         const qubit2Width = r2 * GRID_SPACING;  // Qubit block 2: r1 rows × r2 cols
         const qubit2Height = r1 * GRID_SPACING;
 
-        const zStabWidth = n2 * GRID_SPACING;   // Z-stab: r2 rows × n2 cols (transposed)
+        const zStabWidth = n1 * GRID_SPACING;   // Z-stab: r2 rows × n1 cols (transposed)
         const zStabHeight = r2 * GRID_SPACING;
 
         // Gap between blocks
@@ -143,24 +146,32 @@ const VizModule = (function() {
 
         // === Define the 4 block positions ===
         // The 4 blocks form a perfect rectangle:
-        // - Left column: X-stab (top) and Qubit2 (bottom) - both r2 cols wide
-        // - Right column: Qubit1 (top) and Z-stab (bottom) - both n2 cols wide
+        // - Left column: X-stab (top) and Qubit2 (bottom)
+        // - Right column: Qubit1 (top) and Z-stab (bottom)
+        //
+        // Alignment with C1 (vertical, left):
+        //   - C1 bits (n1) align with Qubit1 rows AND Z-stab columns
+        //   - C1 checks (r1) align with X-stab columns AND Qubit2 rows
+        //
+        // Alignment with C2 (horizontal, top):
+        //   - C2 bits (n2) align with X-stab rows AND Qubit1 columns
+        //   - C2 checks (r2) align with Qubit2 columns AND Z-stab rows
 
-        // X-stabilizers: top-left (n2 rows × r2 cols) - TRANSPOSED
+        // X-stabilizers: top-left (n2 rows × r1 cols) - TRANSPOSED
         // - Rows align with C2 bit nodes (n2 rows)
-        // - Cols align with C2 check nodes (r2 cols)
+        // - Cols align with C1 check nodes (r1 cols)
         layout.xStabBounds = {
             x: hgpStartX,
             y: hgpStartY,
             width: xStabWidth,
             height: xStabHeight,
-            rows: n2,    // transposed: was r1
-            cols: r2     // transposed: was n2
+            rows: n2,    // C2 bits
+            cols: r1     // C1 checks
         };
 
         // Qubits block 1 (n1 rows × n2 cols): top-right
-        // - Rows align with C1 bit nodes
-        // - Cols align with C2 bit nodes
+        // - Rows align with C1 bit nodes (n1)
+        // - Cols align with C2 bit nodes (n2)
         layout.qubit1Bounds = {
             x: hgpStartX + leftColWidth + blockGap,
             y: hgpStartY,
@@ -171,8 +182,8 @@ const VizModule = (function() {
         };
 
         // Qubits block 2 (r1 rows × r2 cols): bottom-left
-        // - Rows align with C1 check nodes
-        // - Cols align with C2 check nodes
+        // - Rows align with C1 check nodes (r1)
+        // - Cols align with C2 check nodes (r2)
         layout.qubit2Bounds = {
             x: hgpStartX,
             y: hgpStartY + topRowHeight + blockGap,
@@ -182,22 +193,22 @@ const VizModule = (function() {
             cols: r2
         };
 
-        // Z-stabilizers: bottom-right (r2 rows × n2 cols) - TRANSPOSED
+        // Z-stabilizers: bottom-right (r2 rows × n1 cols) - TRANSPOSED
         // - Rows align with C2 check nodes (r2 rows)
-        // - Cols align with C2 bit nodes (n2 cols)
+        // - Cols align with C1 bit nodes (n1 cols)
         layout.zStabBounds = {
             x: hgpStartX + leftColWidth + blockGap,
             y: hgpStartY + topRowHeight + blockGap,
             width: zStabWidth,
             height: zStabHeight,
-            rows: r2,    // transposed: was n1
-            cols: n2     // transposed: was r2
+            rows: r2,    // C2 checks
+            cols: n1     // C1 bits
         };
 
         // === C1 Tanner Graph (vertical, on left) ===
         // Two separate groups: bit nodes (n1) and check nodes (r1)
-        // - Bit nodes (circles) align with Qubit1 rows (n1 rows) - RIGHT column
-        // - Check nodes (squares) align with Qubit2 rows (r1 rows) - LEFT column bottom
+        // - Bit nodes (circles, n1) align with Qubit1 rows AND Z-stab columns
+        // - Check nodes (squares, r1) align with X-stab columns AND Qubit2 rows
         const c1X = MARGIN + c1TannerWidth / 2;
 
         // C1 bit nodes - align with Qubit1 rows (n1 nodes)
@@ -222,21 +233,21 @@ const VizModule = (function() {
 
         // === C2 Tanner Graph (horizontal, on top) ===
         // Two separate groups: check nodes (r2) and bit nodes (n2)
-        // - Check nodes (squares) align with left column (X-stab cols = Qubit2 cols = r2)
-        // - Bit nodes (circles) align with right column (Qubit1 cols = Z-stab cols = n2)
+        // - Check nodes (squares, r2) align with Qubit2 columns AND Z-stab rows
+        // - Bit nodes (circles, n2) align with X-stab rows AND Qubit1 columns
         const c2Y = MARGIN + c2TannerHeight / 2;
 
-        // C2 check nodes - align with left column (r2 nodes)
+        // C2 check nodes - align with Qubit2 columns (r2 nodes, left side)
         layout.c2.checks = [];
         for (let j = 0; j < r2; j++) {
             layout.c2.checks.push({
-                x: layout.xStabBounds.x + j * GRID_SPACING + GRID_SPACING / 2,
+                x: layout.qubit2Bounds.x + j * GRID_SPACING + GRID_SPACING / 2,
                 y: c2Y,
                 index: j
             });
         }
 
-        // C2 bit nodes - align with right column (n2 nodes)
+        // C2 bit nodes - align with Qubit1 columns (n2 nodes, right side)
         layout.c2.bits = [];
         for (let j = 0; j < n2; j++) {
             layout.c2.bits.push({
@@ -280,30 +291,59 @@ const VizModule = (function() {
             }
         }
 
-        // X-stabilizer positions (r1 × n2) - top left
+        // X-stabilizer positions - TRANSPOSED to (n2 rows × r2 cols)
+        // Original: r1*n2 checks indexed as (i,j) where i∈[0,r1), j∈[0,n2)
+        // Transposed: displayed as (j,i) where j∈[0,n2) is row, i∈[0,r1) maps to column
+        // But we only have r2 columns, so we need to map r1 checks to r2 columns
+        // Actually, looking at the structure more carefully:
+        // X-stab block has n2 rows (aligned with C2 bits) and r2 cols (aligned with C2 checks)
+        // The original r1*n2 X-checks need to be mapped: checkIdx = i*n2 + j
+        // In transposed view: row = j (0 to n2-1), col = i (0 to r1-1)
+        // But we only have r2 cols! So this needs more thought...
+        //
+        // Actually, in the HGP structure, X-stab should connect to both qubit blocks
+        // Let me reconsider: X-stab columns should align with C2 checks (r2)
+        // and X-stab rows should align with C2 bits (n2)
+        // So X-stab is n2 × r2, but we have r1*n2 X-checks...
+        // This means each cell might represent multiple checks, OR
+        // the X-stab block represents something else.
+        //
+        // Looking at hyperUI.png again: the X-stab block IS r1 rows × n2 cols
+        // but it's positioned with columns aligned to C2 checks.
+        // Wait - in hyperUI.png, the X-stab has the SAME number of columns as C2 checks (r)
+        // So X-stab should be arranged as n2 rows × r2 cols where each cell (row j, col i)
+        // represents the check that connects C1 check i with C2 bit j
+        // Original checkIdx = i*n2 + j, transposed position: row=j, col=i
         layout.xStabilizers = [];
-        for (let i = 0; i < r1; i++) {
-            for (let j = 0; j < n2; j++) {
+        for (let i = 0; i < r1; i++) {           // C1 check index (becomes column after transpose)
+            for (let j = 0; j < n2; j++) {       // C2 bit index (becomes row after transpose)
+                const checkIdx = i * n2 + j;     // Original linear index
                 layout.xStabilizers.push({
-                    x: layout.xStabBounds.x + j * GRID_SPACING + GRID_SPACING / 2,
-                    y: layout.xStabBounds.y + i * GRID_SPACING + GRID_SPACING / 2,
-                    row: i,
-                    col: j,
-                    checkIdx: i * n2 + j
+                    x: layout.xStabBounds.x + i * GRID_SPACING + GRID_SPACING / 2,  // col = i (C1 check)
+                    y: layout.xStabBounds.y + j * GRID_SPACING + GRID_SPACING / 2,  // row = j (C2 bit)
+                    row: j,      // C2 bit index
+                    col: i,      // C1 check index
+                    checkIdx: checkIdx
                 });
             }
         }
 
-        // Z-stabilizer positions (n1 × r2) - bottom right
+        // Z-stabilizer positions - TRANSPOSED to (r2 rows × n2 cols)
+        // Original: n1*r2 checks indexed as (i,j) where i∈[0,n1), j∈[0,r2)
+        // Transposed: displayed as (j,i) where j∈[0,r2) is row, i∈[0,n1) is column
+        // Z-stab columns should align with C2 bits (n2)
+        // Z-stab rows should align with C2 checks (r2)
+        // Original checkIdx = i*r2 + j, transposed position: row=j, col=i
         layout.zStabilizers = [];
-        for (let i = 0; i < n1; i++) {
-            for (let j = 0; j < r2; j++) {
+        for (let i = 0; i < n1; i++) {           // C1 bit index (becomes column after transpose)
+            for (let j = 0; j < r2; j++) {       // C2 check index (becomes row after transpose)
+                const checkIdx = i * r2 + j;     // Original linear index
                 layout.zStabilizers.push({
-                    x: layout.zStabBounds.x + j * GRID_SPACING + GRID_SPACING / 2,
-                    y: layout.zStabBounds.y + i * GRID_SPACING + GRID_SPACING / 2,
-                    row: i,
-                    col: j,
-                    checkIdx: i * r2 + j
+                    x: layout.zStabBounds.x + i * GRID_SPACING + GRID_SPACING / 2,  // col = i (C1 bit)
+                    y: layout.zStabBounds.y + j * GRID_SPACING + GRID_SPACING / 2,  // row = j (C2 check)
+                    row: j,      // C2 check index
+                    col: i,      // C1 bit index
+                    checkIdx: checkIdx
                 });
             }
         }
@@ -846,10 +886,10 @@ const VizModule = (function() {
         // Block labels
         ctx.font = '11px Segoe UI, sans-serif';
 
-        // X-stabilizers label (top-left)
+        // X-stabilizers label (top-left) - transposed: n2 rows × r1 cols
         ctx.fillStyle = '#8B008B';
         ctx.fillText(
-            `X-stab (${r1}×${n2})`,
+            `X-stab (${n2}×${r1})`,
             layout.xStabBounds.x + layout.xStabBounds.width / 2,
             layout.xStabBounds.y + layout.xStabBounds.height + 15
         );
@@ -870,10 +910,10 @@ const VizModule = (function() {
             layout.qubit2Bounds.y + layout.qubit2Bounds.height + 15
         );
 
-        // Z-stabilizers label (bottom-right)
+        // Z-stabilizers label (bottom-right) - transposed: r2 rows × n1 cols
         ctx.fillStyle = '#B8860B';
         ctx.fillText(
-            `Z-stab (${n1}×${r2})`,
+            `Z-stab (${r2}×${n1})`,
             layout.zStabBounds.x + layout.zStabBounds.width / 2,
             layout.zStabBounds.y + layout.zStabBounds.height + 15
         );
